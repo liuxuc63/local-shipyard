@@ -52,14 +52,12 @@ services:
         depends_on:
             - discovery
             - swarm-manager
-    sleep:
-        image: rtezli/sleep5
 
     shipyard:
         image: shipyard/shipyard
         restart: always
         ports:
-            - "88:88"
+            - "8080:8080"
         links:
             - rethinkdb
             - swarm-manager
@@ -70,4 +68,3 @@ services:
             - proxy
             - swarm-manager
             - swarm-agent
-            
