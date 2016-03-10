@@ -1,0 +1,73 @@
+version: '2'
+
+services:
+    discovery:
+        image: progrium/consul
+        ports:
+            - "8400:8400"
+            - "8500:8500"
+            - "8600:53/udp"
+        command: -server -bootstrap
+
+    docker-registry:
+        image: registry
+        ports:
+            - "5000:5000"
+        environment:
+            REGISTRY_AUTH: silly
+
+    rethinkdb:
+        image: shipyard/rethinkdb
+        ports:
+            - "127.0.0.1:49153:49153"
+            - "127.0.0.1:49154:28015"
+            - "127.0.0.1:29015:29015"
+
+    proxy:
+        image: shipyard/docker-proxy
+        ports:
+            - "2375:2375"
+        environment:
+            PORT: 2375
+        command: -v var/run/docker.sock:/var/run/docker.sock
+
+    swarm-manager:
+        image: swarm
+        restart: always
+        links:
+            - discovery
+        command: manage --host tcp://0.0.0.0:3375 consul://discovery:8500
+        ports:
+            - "3375"
+        depends_on:
+            - discovery
+
+    swarm-agent:
+        image: swarm
+        restart: always
+        links:
+            - discovery
+            - swarm-manager
+        command: join --addr swarm-manager:2375 consul://discovery:8500
+        depends_on:
+            - discovery
+            - swarm-manager
+    sleep:
+        image: rtezli/sleep5
+
+    shipyard:
+        image: shipyard/shipyard
+        restart: always
+        ports:
+            - "88:88"
+        links:
+            - rethinkdb
+            - swarm-manager
+        command: server -l 0.0.0.0:88 -d tcp://swarm-manager:3375 --rethinkdb-addr rethinkdb:28015
+        depends_on:
+            - docker-registry
+            - rethinkdb
+            - proxy
+            - swarm-manager
+            - swarm-agent
+            
